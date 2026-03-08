@@ -1,0 +1,27 @@
+# Python
+gen_ai/.env
+gen_ai/venv/
+gen_ai/__pycache__/
+gen_ai/static/*.wav
+gen_ai/static/*.mp3
+
+# Node / frontend
+node_modules/
+
+# Database
+*.sqlite
+*.db
+
+# AI data (privacy)
+data/
+faces/
+snapshots/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
