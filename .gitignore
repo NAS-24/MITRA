@@ -25,3 +25,6 @@ Thumbs.db
 .vscode/
 .idea/
 
+#Data
+ai_core/data.json
+ai_core/face_db.json
