@@ -1,52 +1,106 @@
 import cv2
-import time
-import json
+from matcher import load_db, save_db, get_embedding, find_match
+from datetime import datetime
+import uuid
+import requests
+from matcher import extract_face
+API_URL = "http://localhost:8000/generate_interaction"
 
-from vision import get_face, get_embedding
-from matcher import match_embedding
-
-
-# Load database
-with open(r"F:\Mitra\MITRA\ai_core\data.json", "r") as f:
-    database = json.load(f)
-
+db = load_db()
 
 cap = cv2.VideoCapture(0)
 
-last_embedding_time = 0
-INTERVAL = 2  # seconds
-
+print("Press C to capture | ESC to exit")
 
 while True:
     ret, frame = cap.read()
     if not ret:
-        print("Camera error")
         break
 
-    face = get_face(frame)
+    cv2.imshow("Camera", frame)
+    key = cv2.waitKey(1) & 0xFF
 
-    current_time = time.time()
+    if key == ord('c'):
+        try:
+            # 1. Extract face + embedding
+            face = extract_face(frame)
+            embedding = get_embedding(face)
 
-    if face is not None and (current_time - last_embedding_time > INTERVAL):
+            # 2. Match
+            name, score = find_match(embedding, db)
 
-        embedding = get_embedding(face)
+            # ----------------------------
+            # CASE 1: KNOWN PERSON
+            # ----------------------------
+            if name and score > 8.75:
+                print(f"[MATCH] {name} ({score:.2f})")
 
-        if embedding is not None:
-            person_id, score = match_embedding(embedding, database)
+                person = db[name]
+                person["last_met"] = datetime.now().isoformat()
+                save_db(db)
 
-            result = {
-                "person_id": person_id,
-                "confidence_score": round(score, 3),
-                "is_unknown": person_id is None
-            }
+                event = {
+                    "person_id": person.get("id"),
+                    "name": name,
+                    "relationship": person.get("relationship", "Unknown"),
+                    "last_met_timestamp": person.get("last_met"),
+                    "notes": person.get("notes", ""),
+                    "confidence_score": float(score),
+                    "is_unknown": False,
+                    "preferred_language": "English"
+                }
 
-            print(result)
+            # ----------------------------
+            # CASE 2: UNKNOWN PERSON
+            # ----------------------------
+            else:
+                print("[NEW FACE]")
 
-        last_embedding_time = current_time
+                new_name = input("Enter name: ").strip()
+                relationship = input("Relationship: ").strip()
+                notes = input("Notes: ").strip()
 
-    cv2.imshow("MITRA Camera", frame)
+                db[new_name] = {
+                    "id": str(uuid.uuid4()),
+                    "embedding": embedding,
+                    "relationship": relationship,
+                    "notes": notes,
+                    "last_met": datetime.now().isoformat()
+                }
 
-    if cv2.waitKey(1) & 0xFF == 27:  # ESC key
+                save_db(db)
+
+                event = {
+                    "person_id": db[new_name]["id"],
+                    "name": new_name,
+                    "relationship": relationship,
+                    "last_met_timestamp": db[new_name]["last_met"],
+                    "notes": notes,
+                    "confidence_score": 0.0,
+                    "is_unknown": True,
+                    "preferred_language": "English"
+                }
+
+            # ----------------------------
+            # SEND TO MITRA API
+            # ----------------------------
+            print("[SENDING]", event)
+
+            response = requests.post(API_URL, json=event)
+
+            if response.status_code == 200:
+                data = response.json()
+                print("[MITRA RESPONSE]", data)
+
+                if data.get("audio_url"):
+                    print("Audio URL:", data["audio_url"])
+            else:
+                print("API Error:", response.text)
+
+        except Exception as e:
+            print("Error:", e)
+
+    elif key == 27:
         break
 
 cap.release()
