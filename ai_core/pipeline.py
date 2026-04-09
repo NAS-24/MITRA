@@ -32,7 +32,7 @@ while True:
             # ----------------------------
             # CASE 1: KNOWN PERSON
             # ----------------------------
-            if name:
+            if name and score > 8.75:
                 print(f"[MATCH] {name} ({score:.2f})")
 
                 person = db[name]

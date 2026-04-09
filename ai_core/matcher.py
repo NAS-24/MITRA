@@ -5,15 +5,13 @@ from deepface import DeepFace
 import cv2
 from mtcnn import MTCNN
 
-detector = MTCNN()
-
-import cv2
-from mtcnn import MTCNN
 
 detector = MTCNN()
+def normalize(x):
+    return x / np.linalg.norm(x)
 
 def extract_face(frame):
-    # 🔥 Convert BGR → RGB (CRITICAL FIX)
+    # Convert BGR → RGB (CRITICAL FIX)
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     results = detector.detect_faces(rgb)
@@ -69,7 +67,7 @@ def save_db(db):
     for name, data in db.items():
         serializable_db[name] = {
             "id": data["id"],
-            "embedding": data["embedding"].tolist(),
+            "embedding": list(data["embedding"]),
             "relationship": data["relationship"],
             "notes": data["notes"],
             "last_met": data["last_met"]
@@ -92,7 +90,7 @@ def cosine_similarity(a, b):
 
 
 
-def find_match(embedding, db, threshold=0.7):
+def find_match(embedding, db, threshold=0.9):
     best_match = None
     best_score = -1
 
@@ -110,7 +108,7 @@ def find_match(embedding, db, threshold=0.7):
 
     return None, best_score
 
-def build_response(name, score, threshold=0.85):
+def build_response(name, score, threshold=0.9):
     if name:
         return {
             "person_id": name,
