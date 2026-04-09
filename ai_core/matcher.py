@@ -1,29 +1,43 @@
+import os
+import json
 import numpy as np
+from deepface import DeepFace
 
-THRESHOLD = 0.75  # prototype threshold
+DB_PATH = "face_db.json"
 
+def load_db():
+    if not os.path.exists(DB_PATH):
+        return {}
+    with open(DB_PATH, "r") as f:
+        return json.load(f)
+
+def save_db(db):
+    with open(DB_PATH, "w") as f:
+        json.dump(db, f)
+
+def get_embedding(frame):
+    result = DeepFace.represent(
+        img_path=frame,
+        model_name="ArcFace",
+        enforce_detection=True
+    )
+    return result[0]["embedding"]
 
 def cosine_similarity(a, b):
-    a = np.array(a)
-    b = np.array(b)
+    a, b = np.array(a), np.array(b)
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)) #cosθ = (a · b) / (||a|| × ||b||)
-
-
-def match_embedding(embedding, database):
+def find_match(embedding, db, threshold=0.6):
+    best_match = None
     best_score = -1
-    best_id = None
-    print(database.items())
 
-    for person_id, embeddings in database.items():
-        for db_emb in embeddings:
-            score = cosine_similarity(embedding, db_emb)
+    for name, stored in db.items():
+        score = cosine_similarity(embedding, stored)
+        if score > best_score:
+            best_score = score
+            best_match = name
 
-            if score > best_score:
-                best_score = score
-                best_id = person_id
+    if best_score > threshold:
+        return best_match, best_score
 
-    if best_score < THRESHOLD:
-        return None, float(best_score)
-
-    return best_id, float(best_score)
+    return None, None

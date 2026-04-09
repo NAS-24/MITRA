@@ -1,52 +1,37 @@
 import cv2
-import time
-import json
+from matcher import load_db, save_db, get_embedding, find_match
 
-from vision import get_face, get_embedding
-from matcher import match_embedding
-
-
-# Load database
-with open(r"F:\Mitra\MITRA\ai_core\data.json", "r") as f:
-    database = json.load(f)
-
+db = load_db()
 
 cap = cv2.VideoCapture(0)
 
-last_embedding_time = 0
-INTERVAL = 2  # seconds
-
+print("Press C to capture | ESC to exit")
 
 while True:
     ret, frame = cap.read()
     if not ret:
-        print("Camera error")
         break
 
-    face = get_face(frame)
+    cv2.imshow("Camera", frame)
+    key = cv2.waitKey(1)
 
-    current_time = time.time()
+    if key == ord('c'):
+        try:
+            embedding = get_embedding(frame)
+            name, score = find_match(embedding, db)
 
-    if face is not None and (current_time - last_embedding_time > INTERVAL):
+            if name:
+                print(f"[MATCH] {name} ({score:.2f})")
+            else:
+                new_name = input("Enter name: ")
+                db[new_name] = embedding
+                save_db(db)
+                print("[SAVED] New face added")
 
-        embedding = get_embedding(face)
+        except Exception as e:
+            print("Error:", e)
 
-        if embedding is not None:
-            person_id, score = match_embedding(embedding, database)
-
-            result = {
-                "person_id": person_id,
-                "confidence_score": round(score, 3),
-                "is_unknown": person_id is None
-            }
-
-            print(result)
-
-        last_embedding_time = current_time
-
-    cv2.imshow("MITRA Camera", frame)
-
-    if cv2.waitKey(1) & 0xFF == 27:  # ESC key
+    elif key == 27:
         break
 
 cap.release()
