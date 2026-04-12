@@ -28,3 +28,5 @@ Thumbs.db
 #Data
 ai_core/data.json
 ai_core/face_db.json
+.env
+.json

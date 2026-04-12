@@ -1,25 +1,26 @@
-from fastapi import FastAPI, UploadFile, File
-import numpy as np
-import cv2
-from matcher import load_db, get_embedding, find_match, build_response
+from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.responses import JSONResponse
+from pipeline import process_image
 
 app = FastAPI()
-db = load_db()
 
-@app.post("/recognize")
-async def recognize(file: UploadFile = File(...)):
-    contents = await file.read()
+@app.post("/upload-image/")
+async def upload_image(
+    file: UploadFile = File(...),
+    name: str = Form(None),
+    relationship: str = Form(None),
+    notes: str = Form(None)
+):
+    image_bytes = await file.read()
 
-    # Convert bytes → image
-    np_arr = np.frombuffer(contents, np.uint8)
-    frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    result = process_image(
+        image_bytes,
+        name=name,
+        relationship=relationship,
+        notes=notes
+    )
 
-    try:
-        embedding = get_embedding(frame)
-        name, score = find_match(embedding, db)
+    if "error" in result:
+        return JSONResponse(content=result, status_code=400)
 
-        response = build_response(name, score)
-        return response
-
-    except Exception as e:
-        return {"error": str(e)}
+    return JSONResponse(content=result)
