@@ -30,3 +30,26 @@ ai_core/data.json
 ai_core/face_db.json
 .env
 .json
+
+
+# Ignore ALL images (anywhere)
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.bmp
+*.tiff
+*.tif
+*.gif
+*.heic
+*.heif
+**/*.jpg
+**/*.jpeg
+**/*.png
+**/*.webp
+**/*.bmp
+**/*.tiff
+**/*.tif
+**/*.gif
+**/*.heic
+**/*.heif

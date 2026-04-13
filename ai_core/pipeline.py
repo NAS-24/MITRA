@@ -9,7 +9,9 @@ API_URL = "http://localhost:8000/generate_interaction"
 
 db = load_db()
 
-def process_image(frame, name=None, relationship=None, notes=None):
+def process_image(frame, name, relationship, notes):
+    name_unknown = name
+    
     
     try:
             
@@ -21,28 +23,28 @@ def process_image(frame, name=None, relationship=None, notes=None):
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if frame is None:
-            print("Error: Unable to decode image")
+            print("Error: Unable to decode image", flush=True)
             return {"error": "Invalid image format"}
 
         face = extract_face(frame)
         embedding = get_embedding(face)
 
         # 2. Match
-        name, score = find_match(embedding, db)
+        matched_name, score = find_match(embedding, db)
 
         # ----------------------------
         # CASE 1: KNOWN PERSON
         # ----------------------------
-        if name and score > 8.75:
-            print(f"[MATCH] {name} ({score:.2f})")
+        if matched_name and score > 8.75:
+            print(f"[MATCH] {matched_name} ({score:.2f})", flush=True)
 
-            person = db[name]
+            person = db[matched_name]
             person["last_met"] = datetime.now().isoformat()
             save_db(db)
 
             event = {
                 "person_id": person.get("id"),
-                "name": name,
+                "name": matched_name,
                 "relationship": person.get("relationship", "Unknown"),
                 "last_met_timestamp": person.get("last_met"),
                 "notes": person.get("notes", ""),
@@ -55,16 +57,17 @@ def process_image(frame, name=None, relationship=None, notes=None):
         # CASE 2: UNKNOWN PERSON
         # ----------------------------
         else:
-            print("[NEW FACE]")
+            print("[NEW FACE]", flush=True)
+            print("DEBUG INPUT IN PIPELINE:", name_unknown, relationship, notes, flush=True)
 
-            if not name:
+            if not name_unknown:
                 return {
                     "error": "Unknown face detected. Send name to register."
                 }
 
             person_id = str(uuid.uuid4())
 
-            db[name] = {
+            db[name_unknown] = {
                 "id": person_id,
                 "embedding": embedding,
                 "relationship": relationship or "Unknown",
@@ -73,7 +76,7 @@ def process_image(frame, name=None, relationship=None, notes=None):
             }
 
             save_db(db)
-            print(f"[REGISTERED] {name} / ID: {person_id} / Relationship: {relationship} / Notes: {notes}")
+            print(f"[REGISTERED] {name} / ID: {person_id} / Relationship: {relationship} / Notes: {notes}", flush=True)
 
             return {
                 "person_id": person_id,
@@ -90,10 +93,10 @@ def process_image(frame, name=None, relationship=None, notes=None):
 
         if response.status_code == 200:
             data = response.json()
-            print("[MITRA RESPONSE]", data)
+            print("[MITRA RESPONSE]", data, flush=True)
 
             if data.get("audio_url"):
-                print("Audio URL:", data["audio_url"])
+                print("Audio URL:", data["audio_url"], flush=True)
         else:
             print("API Error:", response.text)
 

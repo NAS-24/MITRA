@@ -11,16 +11,30 @@ async def upload_image(
     relationship: str = Form(None),
     notes: str = Form(None)
 ):
-    image_bytes = await file.read()
+    frame = await file.read()
+
+    
+    name = name.strip() if name else None
+    relationship = relationship.strip() if relationship else None
+    notes = notes.strip() if notes else None
+
+    print("DEBUG INPUT:", name, relationship, notes, flush=True)
 
     result = process_image(
-        image_bytes,
+        frame=frame,   
         name=name,
         relationship=relationship,
         notes=notes
     )
 
-    if "error" in result:
+    
+    if result is None:
+        return JSONResponse(
+            content={"status": "error", "message": "Pipeline returned None"},
+            status_code=500
+        )
+
+    if result.get("status") == "error":
         return JSONResponse(content=result, status_code=400)
 
-    return JSONResponse(content=result)
+    return JSONResponse(content=result, status_code=200)

@@ -76,13 +76,15 @@ def save_db(db):
     with open("face_db.json", "w") as f:
         json.dump(serializable_db, f)
 
-def get_embedding(frame):
+def get_embedding(face):
     result = DeepFace.represent(
-        img_path=frame,
+        img_path=face,
         model_name="ArcFace",
-        enforce_detection=True
+        enforce_detection=False  
     )
-    return result[0]["embedding"]
+    embedding = np.array(result[0]["embedding"])
+    return embedding
+
 
 def cosine_similarity(a, b):
     a, b = np.array(a), np.array(b)
@@ -90,14 +92,13 @@ def cosine_similarity(a, b):
 
 
 
-def find_match(embedding, db, threshold=0.9):
+def find_match(embedding, db, threshold=0.9):  # cosine range is -1 to 1
     best_match = None
     best_score = -1
 
     for name, data in db.items():
         db_embedding = np.array(data["embedding"])
-
-        score = np.dot(embedding, db_embedding)
+        score = np.dot(embedding, db_embedding)  # now valid cosine since both normalized
 
         if score > best_score:
             best_score = score
@@ -107,7 +108,6 @@ def find_match(embedding, db, threshold=0.9):
         return best_match, best_score
 
     return None, best_score
-
 def build_response(name, score, threshold=0.9):
     if name:
         return {
