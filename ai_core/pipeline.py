@@ -2,19 +2,15 @@ import cv2
 from matcher import load_db, save_db, get_embedding, find_match
 from datetime import datetime
 import uuid
-import requests
 from matcher import extract_face
 import numpy as np
-API_URL = "http://localhost:8000/generate_interaction"
 
 db = load_db()
 
 def process_image(frame, name, relationship, notes):
     name_unknown = name
-    
-    
+
     try:
-            
         nparr = np.frombuffer(frame, np.uint8)
 
         if nparr.size == 0:
@@ -42,14 +38,15 @@ def process_image(frame, name, relationship, notes):
             person["last_met"] = datetime.now().isoformat()
             save_db(db)
 
-            event = {
-                "person_id": person.get("id"),
-                "name": matched_name,
-                "relationship": person.get("relationship", "Unknown"),
+            # Return directly — frontend will call generate_interaction
+            return {
+                "person_id":          person.get("id"),
+                "name":               matched_name,
+                "relationship":       person.get("relationship", "Unknown"),
                 "last_met_timestamp": person.get("last_met"),
-                "notes": person.get("notes", ""),
-                "confidence_score": float(score),
-                "is_unknown": False,
+                "notes":              person.get("notes", ""),
+                "confidence_score":   float(score),
+                "is_unknown":         False,
                 "preferred_language": "English"
             }
 
@@ -79,30 +76,16 @@ def process_image(frame, name, relationship, notes):
             print(f"[REGISTERED] {name} / ID: {person_id} / Relationship: {relationship} / Notes: {notes}", flush=True)
 
             return {
-                "person_id": person_id,
-                "name": name,
-                "relationship": relationship,
+                "person_id":          person_id,
+                "name":               name,
+                "relationship":       relationship or "Unknown",
                 "last_met_timestamp": db[name]["last_met"],
-                "notes": notes,
-                "confidence_score": 0.0,
-                "is_unknown": True,
+                "notes":              notes or "",
+                "confidence_score":   0.0,
+                "is_unknown":         True,
                 "preferred_language": "English"
             }
 
-        response = requests.post(API_URL, json=event)
-
-        if response.status_code == 200:
-            data = response.json()
-            print("[MITRA RESPONSE]", data, flush=True)
-
-            if data.get("audio_url"):
-                print("Audio URL:", data["audio_url"], flush=True)
-        else:
-            print("API Error:", response.text)
-
     except Exception as e:
-        print("Error:", e)
-
-    return {
-    "error": "Unhandled pipeline case"
-}
+        print("Error:", e, flush=True)
+        return {"error": str(e)}

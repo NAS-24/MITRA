@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>FaceAssist</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #f0ede8;
+  --bg2:      #faf8f5;
+  --bg3:      #ede9e2;
+  --bg4:      #e4e0d8;
+  --border:   rgba(0,0,0,0.08);
+  --border2:  rgba(0,0,0,0.14);
+  --text:     #1a1814;
+  --text2:    #6b6659;
+  --text3:    #a09a8f;
+  --accent:   #5a4fcf;
+  --accent-dim: rgba(90,79,207,0.10);
+  --accent-bg:  rgba(90,79,207,0.07);
+  --green:    #1a7f5a;
+  --green-bg: rgba(26,127,90,0.09);
+  --green-bdr:rgba(26,127,90,0.25);
+  --red:      #c0392b;
+  --red-bg:   rgba(192,57,43,0.08);
+  --amber:    #b06a00;
+  --amber-bg: rgba(176,106,0,0.09);
+  --amber-bdr:rgba(176,106,0,0.25);
+  --shadow:   0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.04);
+  --mono: 'Space Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  max-width:430px;
+  margin:0 auto;
+  overflow-x:hidden;
+  padding-bottom:48px;
+}
+
+/* ── Header ── */
+.hdr{
+  padding:14px 18px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:20;
+  background:rgba(240,237,232,0.94);
+  backdrop-filter:blur(14px);
+}
+.logo{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.09em;}
+.status-pill{
+  display:flex;align-items:center;gap:6px;
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:99px;padding:4px 11px;
+  font-family:var(--mono);font-size:10px;color:var(--text3);
+  letter-spacing:.06em;transition:all .3s;
+}
+.status-pill.active{background:var(--green-bg);border-color:var(--green-bdr);color:var(--green);}
+.status-pill.waiting{background:var(--amber-bg);border-color:var(--amber-bdr);color:var(--amber);}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--text3);transition:background .3s;flex-shrink:0;}
+.status-pill.active .sdot{background:var(--green);animation:breathe 2s infinite;}
+.status-pill.waiting .sdot{background:var(--amber);animation:breathe 1.4s infinite;}
+@keyframes breathe{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+/* ── Camera ── */
+.cam-wrap{
+  position:relative;margin:14px 18px 12px;
+  border-radius:18px;overflow:hidden;
+  background:var(--bg3);border:1px solid var(--border);
+  aspect-ratio:4/3;box-shadow:var(--shadow);
+}
+#video{width:100%;height:100%;object-fit:cover;display:block;transform:scaleX(-1);}
+#snapCanvas{display:none;}
+.cam-error{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;gap:10px;color:var(--text2);font-size:13px;text-align:center;padding:24px;
+}
+.corner{position:absolute;width:22px;height:22px;border-color:var(--accent);border-style:solid;opacity:.5;}
+.corner.tl{top:12px;left:12px;border-width:2px 0 0 2px;border-radius:4px 0 0 0;}
+.corner.tr{top:12px;right:12px;border-width:2px 2px 0 0;border-radius:0 4px 0 0;}
+.corner.bl{bottom:12px;left:12px;border-width:0 0 2px 2px;border-radius:0 0 0 4px;}
+.corner.br{bottom:12px;right:12px;border-width:0 2px 2px 0;border-radius:0 0 4px 0;}
+.scan-line{
+  position:absolute;left:0;right:0;height:1.5px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  opacity:0;animation:scanDown 2.6s linear infinite;
+  pointer-events:none;
+}
+.scan-line.on{opacity:1;}
+@keyframes scanDown{0%{top:0%;}100%{top:100%;}}
+.cam-badge{
+  position:absolute;bottom:12px;left:12px;
+  font-family:var(--mono);font-size:9px;color:var(--text3);
+  background:rgba(240,237,232,.82);padding:3px 8px;border-radius:5px;
+  letter-spacing:.06em;border:1px solid var(--border);
+}
+.cd-chip{
+  position:absolute;bottom:12px;right:12px;
+  font-family:var(--mono);font-size:11px;color:var(--accent);
+  background:rgba(240,237,232,.88);padding:3px 10px;border-radius:5px;
+  min-width:34px;text-align:center;border:1px solid var(--border);
+  font-weight:700;
+}
+
+/* ── Buttons ── */
+.ctrl{display:flex;gap:8px;margin:0 18px 14px;}
+.btn{
+  flex:1;padding:13px 10px;border-radius:12px;
+  border:1px solid var(--border2);background:var(--bg2);
+  color:var(--text);font-family:var(--sans);font-size:14px;font-weight:500;
+  cursor:pointer;transition:all .15s;text-align:center;
+  box-shadow:0 1px 2px rgba(0,0,0,0.05);
+}
+.btn:active{transform:scale(.97);}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(90,79,207,.25);}
+.btn.primary:active{background:#4a40b8;}
+.btn.stop{background:var(--red-bg);border-color:rgba(192,57,43,.25);color:var(--red);}
+.btn.amber{background:var(--amber-bg);border-color:var(--amber-bdr);color:var(--amber);}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+
+/* ── Loading ── */
+.loading-row{
+  margin:0 18px 14px;padding:15px 16px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:14px;
+  display:flex;align-items:center;gap:12px;box-shadow:var(--shadow);
+}
+.spinner{
+  width:20px;height:20px;flex-shrink:0;
+  border:2px solid var(--border2);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .75s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-label{font-size:13px;color:var(--text2);}
+
+/* ── Unknown banner ── */
+.unk-banner{
+  margin:0 18px 14px;padding:14px 15px;
+  background:var(--amber-bg);border:1px solid var(--amber-bdr);
+  border-radius:14px;display:flex;align-items:center;gap:10px;
+  cursor:pointer;font-size:13px;color:var(--amber);
+  box-shadow:var(--shadow);
+}
+.unk-banner svg{flex-shrink:0;}
+.unk-arr{margin-left:auto;opacity:.5;flex-shrink:0;}
+
+/* ── Result Card ── */
+.result-wrap{margin:0 18px 14px;}
+.sect-label{
+  font-family:var(--mono);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text3);margin-bottom:8px;
+}
+.rcard{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:16px;overflow:hidden;
+  transition:border-color .4s;box-shadow:var(--shadow);
+}
+.rcard.known {border-color:var(--green-bdr);}
+.rcard.unknown{border-color:var(--amber-bdr);}
+
+.rcard-head{
+  padding:15px 16px;display:flex;align-items:center;gap:12px;
+  border-bottom:1px solid var(--border);
+}
+.avatar{
+  width:48px;height:48px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:15px;font-weight:700;
+}
+.avatar.known  {background:var(--green-bg);color:var(--green);border:1.5px solid var(--green-bdr);}
+.avatar.unknown{background:var(--amber-bg);color:var(--amber);border:1.5px solid var(--amber-bdr);}
+.rname{font-size:16px;font-weight:600;color:var(--text);}
+.rsub{font-size:11px;color:var(--text2);margin-top:2px;text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);}
+.rlang{margin-left:auto;text-align:right;flex-shrink:0;}
+.rlang-k{font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;}
+.rlang-v{font-size:12px;font-weight:600;margin-top:2px;color:var(--text);}
+
+.narration-row{
+  padding:14px 16px;border-bottom:1px solid var(--border);
+  font-size:14px;color:var(--text2);line-height:1.6;
+  font-style:italic;font-weight:300;background:var(--bg3);
+}
+
+.conf-row{padding:12px 16px;border-bottom:1px solid var(--border);}
+.conf-top{
+  display:flex;justify-content:space-between;
+  font-size:10px;color:var(--text3);font-family:var(--mono);
+  letter-spacing:.05em;text-transform:uppercase;margin-bottom:7px;
+}
+.conf-val{color:var(--text2);}
+.conf-bar{height:4px;background:var(--bg3);border-radius:99px;overflow:hidden;}
+.conf-fill{height:100%;border-radius:99px;transition:width .6s cubic-bezier(.4,0,.2,1);}
+.conf-fill.hi{background:var(--green);}
+.conf-fill.md{background:var(--amber);}
+.conf-fill.lo{background:var(--red);}
+
+.meta-grid{padding:13px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.meta-item{}
+.mkey{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);margin-bottom:3px;}
+.mval{font-size:13px;font-weight:500;color:var(--text);}
+.meta-item.full{grid-column:1/-1;}
+.mval.mono{font-family:var(--mono);font-size:11px;}
+.context-chip{
+  display:inline-block;background:var(--accent-bg);
+  color:var(--accent);border-radius:6px;padding:2px 9px;
+  font-size:11px;font-family:var(--mono);border:1px solid rgba(90,79,207,.15);
+}
+
+/* ── Audio player ── */
+.audio-row{
+  padding:13px 16px;border-top:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;background:var(--bg3);
+}
+.play-btn{
+  width:38px;height:38px;border-radius:50%;flex-shrink:0;
+  background:var(--accent);border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .15s;box-shadow:0 2px 8px rgba(90,79,207,.3);
+}
+.play-btn:active{transform:scale(.92);}
+.audio-info{flex:1;min-width:0;}
+.audio-label{font-size:12px;color:var(--text2);font-weight:500;}
+.audio-engine{font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px;}
+.audio-prog{height:4px;background:var(--bg4);border-radius:99px;margin-top:9px;overflow:hidden;}
+.audio-bar{height:100%;width:0%;background:var(--accent);border-radius:99px;transition:width .1s linear;}
+.audio-time{font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:5px;}
+
+/* ── Empty ── */
+.empty{
+  margin:0 18px 14px;padding:32px 20px;text-align:center;
+  background:var(--bg2);border:1.5px dashed var(--border2);border-radius:16px;
+}
+.empty-icon{font-size:26px;opacity:.2;margin-bottom:10px;}
+.empty p{font-size:13px;color:var(--text2);line-height:1.65;}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  background:var(--text);color:var(--bg2);
+  border-radius:10px;padding:10px 18px;font-size:13px;
+  white-space:nowrap;z-index:500;opacity:0;
+  transition:opacity .25s,bottom .25s;pointer-events:none;
+  box-shadow:0 4px 16px rgba(0,0,0,.18);
+}
+.toast.show{opacity:1;bottom:32px;}
+
+/* ── Register bottom sheet ── */
+.backdrop{
+  position:fixed;inset:0;background:rgba(26,24,20,.55);
+  backdrop-filter:blur(6px);z-index:200;
+  display:flex;align-items:flex-end;
+  opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.backdrop.open{opacity:1;pointer-events:all;}
+.sheet{
+  width:100%;background:var(--bg2);
+  border-radius:24px 24px 0 0;border-top:1px solid var(--border2);
+  padding:8px 20px 48px;
+  transform:translateY(100%);transition:transform .32s cubic-bezier(.4,0,.2,1);
+  box-shadow:0 -4px 32px rgba(0,0,0,.12);
+}
+.backdrop.open .sheet{transform:translateY(0);}
+.drag-h{width:36px;height:4px;background:var(--border2);border-radius:99px;margin:12px auto 20px;}
+.sheet-title{font-size:18px;font-weight:600;margin-bottom:4px;}
+.sheet-sub{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.5;}
+.field{margin-bottom:14px;}
+.field label{
+  display:block;font-size:10px;color:var(--text3);
+  text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);margin-bottom:7px;
+}
+.field input,.field select,.field textarea{
+  width:100%;background:var(--bg3);border:1px solid var(--border2);
+  border-radius:11px;padding:12px 14px;color:var(--text);
+  font-family:var(--sans);font-size:14px;outline:none;
+  transition:border-color .15s;-webkit-appearance:none;appearance:none;
+}
+.field input:focus,.field select:focus,.field textarea:focus{
+  border-color:var(--accent);background:var(--bg2);
+}
+.field input::placeholder,.field textarea::placeholder{color:var(--text3);}
+.field textarea{resize:none;height:80px;}
+.field select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23a09a8f' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 13px center;padding-right:36px;
+}
+.field select option{background:var(--bg3);color:var(--text);}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="hdr">
+  <span class="logo">◉ FACEASSIST</span>
+  <div class="status-pill" id="statusPill">
+    <div class="sdot"></div>
+    <span id="statusTxt">IDLE</span>
+  </div>
+</div>
+
+<!-- Camera -->
+<div class="cam-wrap">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="snapCanvas"></canvas>
+  <div id="camError" class="cam-error" style="display:none;">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".3">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+    <span style="color:var(--text2);font-size:13px;">Camera access needed</span>
+    <button class="btn primary" onclick="initCamera()" style="flex:none;padding:10px 24px;margin-top:4px;font-size:13px;">Enable Camera</button>
+  </div>
+  <div class="corner tl"></div><div class="corner tr"></div>
+  <div class="corner bl"></div><div class="corner br"></div>
+  <div class="scan-line" id="scanLine"></div>
+  <div class="cam-badge" id="camBadge">LIVE</div>
+  <div class="cd-chip" id="cdChip">—</div>
+</div>
+
+<!-- Controls -->
+<div class="ctrl">
+  <button class="btn primary" id="toggleBtn" onclick="toggleScan()">Start Scanning</button>
+  <button class="btn" onclick="manualSnap()">Snap Now</button>
+</div>
+
+<!-- Loading -->
+<div class="loading-row" id="loadingRow" style="display:none;">
+  <div class="spinner"></div>
+  <span class="loading-label" id="loadingTxt">Uploading image…</span>
+</div>
+
+<!-- Unknown Banner -->
+<div class="unk-banner" id="unkBanner" style="display:none;" onclick="openSheet()">
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+  </svg>
+  <div>
+    <div style="font-weight:600;font-size:13px;">New face detected</div>
+    <div style="font-size:11px;opacity:.8;margin-top:1px;">Tap to register this person</div>
+  </div>
+  <svg class="unk-arr" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="m9 18 6-6-6-6"/>
+  </svg>
+</div>
+
+<!-- Result -->
+<div id="resultSection" style="display:none;">
+  <div class="result-wrap">
+    <div class="sect-label">Identified Person</div>
+    <div class="rcard" id="rcard">
+
+      <div class="rcard-head">
+        <div class="avatar" id="ravatar">?</div>
+        <div style="flex:1;min-width:0;">
+          <div class="rname" id="rname">—</div>
+          <div class="rsub" id="rsub">—</div>
+        </div>
+        <div class="rlang">
+          <div class="rlang-k">LANG</div>
+          <div class="rlang-v" id="rlang">—</div>
+        </div>
+      </div>
+
+      <div class="narration-row" id="narrationRow" style="display:none;">
+        <span id="narrationTxt"></span>
+      </div>
+
+      <div class="conf-row">
+        <div class="conf-top">
+          <span>Match Confidence</span>
+          <span class="conf-val" id="confPct">—</span>
+        </div>
+        <div class="conf-bar"><div class="conf-fill" id="confFill" style="width:0%"></div></div>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-item">
+          <div class="mkey">Context</div>
+          <div class="mval"><span class="context-chip" id="mcontext">—</span></div>
+        </div>
+        <div class="meta-item">
+          <div class="mkey">Voice Engine</div>
+          <div class="mval mono" id="mengine">—</div>
+        </div>
+        <div class="meta-item full" id="mnotesRow" style="display:none;">
+          <div class="mkey">Notes</div>
+          <div class="mval" id="mnotes" style="font-weight:400;color:var(--text2);">—</div>
+        </div>
+      </div>
+
+      <div class="audio-row" id="audioRow" style="display:none;">
+        <button class="play-btn" id="playBtn" onclick="toggleAudio()">
+          <svg id="playIcon" width="14" height="14" viewBox="0 0 24 24" fill="#fff">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+        </button>
+        <div class="audio-info">
+          <div class="audio-label">Voice Narration</div>
+          <div class="audio-engine" id="audioEngine">—</div>
+          <div class="audio-prog"><div class="audio-bar" id="audioBar"></div></div>
+          <div class="audio-time" id="audioTime">0:00 / 0:00</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Empty state -->
+<div class="empty" id="emptyState">
+  <div class="empty-icon">◉</div>
+  <p>Start scanning to identify faces in view.<br>Auto-captures every 5 seconds.</p>
+</div>
+
+<div class="toast" id="toast"></div>
+<audio id="audioEl" preload="none"></audio>
+
+<!-- Register Sheet -->
+<div class="backdrop" id="backdrop" onclick="handleBdClick(event)">
+  <div class="sheet">
+    <div class="drag-h"></div>
+    <div class="sheet-title">Register New Person</div>
+    <div class="sheet-sub">A new face was detected. Fill in the details so this person can be identified next time.</div>
+
+    <div class="field">
+      <label>Full Name *</label>
+      <input type="text" id="rName" placeholder="e.g. Priya Sharma" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Relationship *</label>
+      <select id="rRel">
+        <option value="">Select relationship…</option>
+        <option>Family</option>
+        <option>Friend</option>
+        <option>Colleague</option>
+        <option>Neighbor</option>
+        <option>Caregiver</option>
+        <option>Doctor</option>
+        <option>Acquaintance</option>
+        <option>Other</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Notes / Context</label>
+      <textarea id="rNotes" placeholder="Any helpful context about this person…"></textarea>
+    </div>
+
+    <div class="ctrl" style="margin:8px 0 0;">
+      <button class="btn" onclick="closeSheet()">Cancel</button>
+      <button class="btn primary" id="regBtn" onclick="submitReg()">Register &amp; Identify</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const UPLOAD_URL   = 'http://127.0.0.1:8000/upload-image/';
+const INTERACT_URL = 'http://127.0.0.1:5000/generate_interaction';
+
+let camStream      = null;
+let scanning       = false;
+let cdTimer        = null;
+let cdVal          = 5;
+let lastBlob       = null;
+let audioPlaying   = false;
+let isRegistration = false;   // true when pipeline is called after a registration submit
+
+/* Track which person IDs have already had audio played.
+   Audio plays only once per unique person per session. */
+const audioPlayed = new Set();
+
+const video   = document.getElementById('video');
+const canvas  = document.getElementById('snapCanvas');
+const audioEl = document.getElementById('audioEl');
+
+/* ── Camera ── */
+async function initCamera() {
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+    });
+    video.srcObject = camStream;
+    video.style.display = 'block';
+    document.getElementById('camError').style.display = 'none';
+  } catch(e) {
+    video.style.display = 'none';
+    document.getElementById('camError').style.display = 'flex';
+  }
+}
+
+/* ── Scan ── */
+function toggleScan() { scanning ? stopScan() : startScan(); }
+
+function startScan() {
+  if (!camStream) { toast('Enable camera first'); return; }
+  scanning = true;
+  setStatus('active', 'SCANNING');
+  const btn = document.getElementById('toggleBtn');
+  btn.textContent = 'Stop Scanning';
+  btn.className = 'btn stop';
+  document.getElementById('scanLine').classList.add('on');
+  document.getElementById('emptyState').style.display = 'none';
+  runCd();
+  captureAndProcess();
+}
+
+function stopScan() {
+  scanning = false;
+  clearInterval(cdTimer);
+  setStatus('', 'IDLE');
+  const btn = document.getElementById('toggleBtn');
+  btn.textContent = 'Start Scanning';
+  btn.className = 'btn primary';
+  document.getElementById('scanLine').classList.remove('on');
+  document.getElementById('cdChip').textContent = '—';
+}
+
+function pauseForUnknown() {
+  /* Pauses the auto-scan cycle but keeps camera live */
+  scanning = false;
+  clearInterval(cdTimer);
+  setStatus('waiting', 'PAUSED');
+  const btn = document.getElementById('toggleBtn');
+  btn.textContent = 'Resume Scanning';
+  btn.className = 'btn amber';
+  document.getElementById('scanLine').classList.remove('on');
+  document.getElementById('cdChip').textContent = '—';
+}
+
+function runCd() {
+  cdVal = 5;
+  document.getElementById('cdChip').textContent = cdVal + 's';
+  clearInterval(cdTimer);
+  cdTimer = setInterval(() => {
+    cdVal--;
+    document.getElementById('cdChip').textContent = cdVal > 0 ? cdVal + 's' : '…';
+    if (cdVal <= 0 && scanning) { cdVal = 5; captureAndProcess(); }
+  }, 1000);
+}
+
+function setStatus(cls, txt) {
+  const p = document.getElementById('statusPill');
+  p.className = 'status-pill' + (cls ? ' ' + cls : '');
+  document.getElementById('statusTxt').textContent = txt;
+}
+
+/* ── Capture ── */
+function grab() {
+  const w = video.videoWidth || 640, h = video.videoHeight || 480;
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.save(); ctx.translate(w, 0); ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, w, h);
+  ctx.restore();
+  return new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.88));
+}
+
+async function captureAndProcess(extra = {}) {
+  if (!camStream) return;
+  const blob = await grab();
+  if (!blob) return;
+  lastBlob = blob;
+  await pipeline(blob, extra);
+}
+
+function manualSnap() {
+  if (!camStream) { toast('Enable camera first'); return; }
+  captureAndProcess();
+}
+
+/* ── Two-step pipeline ── */
+async function pipeline(blob, extra = {}) {
+  setLoading(true, 'Uploading image…');
+  try {
+    /* Step 1: POST /upload-image/ */
+    const fd = new FormData();
+    fd.append('file', blob, 'capture.jpg');
+    /* Always append all fields — FastAPI Form(None) needs the key present
+       even as an empty string, or it receives None and logs "DEBUG INPUT: None None None" */
+    fd.append('name',         extra.name         || '');
+    fd.append('relationship', extra.relationship || '');
+    fd.append('notes',        extra.notes        || '');
+
+    const upRes = await fetch(UPLOAD_URL, { method: 'POST', body: fd });
+    if (!upRes.ok) throw new Error('Upload failed (' + upRes.status + ')');
+    const recog = await upRes.json();
+
+    /* If backend says unknown — stop scanning, show register prompt.
+       BUT if this was already a registration attempt, don't loop — just
+       show a toast and resume (backend may not have flushed the face yet). */
+    if (recog.is_unknown) {
+      setLoading(false);
+      if (isRegistration) {
+        toast('Face saved — resuming scan…');
+        startScan();
+      } else {
+        pauseForUnknown();
+        showUnknownBanner();
+      }
+      return;
+    }
+
+    /* Step 2: POST /generate_interaction
+       Merge any extra registration data so name/relationship always present */
+    const payload = Object.assign({}, recog, {
+      name:         recog.name         || extra.name         || '',
+      relationship: recog.relationship || extra.relationship || '',
+      notes:        recog.notes        || extra.notes        || ''
+    });
+    setLoading(true, 'Generating narration…');
+    const intRes = await fetch(INTERACT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!intRes.ok) throw new Error('Narration failed (' + intRes.status + ')');
+    const interaction = await intRes.json();
+
+    setLoading(false);
+    render(payload, interaction);
+
+  } catch(e) {
+    setLoading(false);
+    toast(e.message);
+    console.error(e);
+  }
+}
+
+/* ── Render ── */
+function render(recog, interaction) {
+  const {
+    person_id       = '',
+    confidence_score = 0,
+    is_unknown      = false,
+    preferred_language = 'English',
+    notes,
+    name,
+    relationship
+  } = recog;
+
+  const {
+    narration_text = '',
+    display_card   = {},
+    voice_engine   = '—',
+    audio_url      = null
+  } = interaction;
+
+  const { title = name || '—', subtitle = relationship || '—', context_clue = '—' } = display_card;
+
+  document.getElementById('unkBanner').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('resultSection').style.display = 'block';
+
+  document.getElementById('rcard').className = 'rcard ' + (is_unknown ? 'unknown' : 'known');
+
+  const av = document.getElementById('ravatar');
+  av.className = 'avatar ' + (is_unknown ? 'unknown' : 'known');
+  av.textContent = is_unknown ? '?'
+    : (title || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+
+  document.getElementById('rname').textContent = title;
+  document.getElementById('rsub').textContent  = subtitle || '—';
+  document.getElementById('rlang').textContent = preferred_language;
+
+  if (narration_text) {
+    document.getElementById('narrationTxt').textContent = '\u201c' + narration_text + '\u201d';
+    document.getElementById('narrationRow').style.display = 'block';
+  } else {
+    document.getElementById('narrationRow').style.display = 'none';
+  }
+
+  const pct = Math.round((confidence_score || 0) * 100);
+  document.getElementById('confPct').textContent = pct + '%';
+  const fill = document.getElementById('confFill');
+  fill.style.width = pct + '%';
+  fill.className = 'conf-fill ' + (pct >= 70 ? 'hi' : pct >= 40 ? 'md' : 'lo');
+
+  document.getElementById('mcontext').textContent = context_clue;
+  document.getElementById('mengine').textContent  = voice_engine;
+
+  if (notes) {
+    document.getElementById('mnotesRow').style.display = 'block';
+    document.getElementById('mnotes').textContent = notes;
+  } else {
+    document.getElementById('mnotesRow').style.display = 'none';
+  }
+
+  /* ── Audio: play only once per person_id ── */
+  if (audio_url) {
+    document.getElementById('audioRow').style.display = 'flex';
+    document.getElementById('audioEngine').textContent = voice_engine;
+
+    /* Always set the source so user can manually replay */
+    audioEl.src = audio_url;
+    audioEl.load();
+    audioPlaying = false;
+    setPlayIcon(false);
+    document.getElementById('audioBar').style.width = '0%';
+    document.getElementById('audioTime').textContent = '0:00 / 0:00';
+
+    audioEl.ontimeupdate = updateAudioUI;
+    audioEl.onended = () => { audioPlaying = false; setPlayIcon(false); };
+
+    /* Auto-play only if this person hasn't been greeted yet this session */
+    if (person_id && !audioPlayed.has(person_id)) {
+      audioPlayed.add(person_id);
+      audioEl.play().then(() => { audioPlaying = true; setPlayIcon(true); }).catch(() => {});
+    }
+  } else {
+    document.getElementById('audioRow').style.display = 'none';
+  }
+}
+
+function showUnknownBanner() {
+  document.getElementById('unkBanner').style.display = 'flex';
+  /* Keep result section visible if there was a previous result, else show empty */
+  if (document.getElementById('resultSection').style.display === 'none') {
+    document.getElementById('emptyState').style.display = 'block';
+  }
+}
+
+/* ── Audio helpers ── */
+function toggleAudio() {
+  if (!audioEl.src) return;
+  if (audioPlaying) {
+    audioEl.pause(); audioPlaying = false; setPlayIcon(false);
+  } else {
+    audioEl.play().then(() => { audioPlaying = true; setPlayIcon(true); }).catch(() => {});
+  }
+}
+
+function setPlayIcon(playing) {
+  document.getElementById('playIcon').innerHTML = playing
+    ? '<rect x="6" y="4" width="4" height="16" rx="1" fill="#fff"/><rect x="14" y="4" width="4" height="16" rx="1" fill="#fff"/>'
+    : '<polygon points="5 3 19 12 5 21 5 3" fill="#fff"/>';
+}
+
+function fmtTime(s) {
+  s = Math.floor(s || 0);
+  return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+}
+
+function updateAudioUI() {
+  if (!audioEl.duration) return;
+  document.getElementById('audioBar').style.width =
+    ((audioEl.currentTime / audioEl.duration) * 100).toFixed(1) + '%';
+  document.getElementById('audioTime').textContent =
+    fmtTime(audioEl.currentTime) + ' / ' + fmtTime(audioEl.duration);
+}
+
+/* ── Register sheet ── */
+function openSheet()  { document.getElementById('backdrop').classList.add('open'); }
+function closeSheet() { document.getElementById('backdrop').classList.remove('open'); }
+function handleBdClick(e) {
+  if (e.target === document.getElementById('backdrop')) closeSheet();
+}
+
+async function submitReg() {
+  const name  = document.getElementById('rName').value.trim();
+  const rel   = document.getElementById('rRel').value;
+  const notes = document.getElementById('rNotes').value.trim();
+  if (!name) { toast('Name is required'); return; }
+  if (!rel)  { toast('Select a relationship'); return; }
+
+  const btn = document.getElementById('regBtn');
+  btn.textContent = 'Registering…'; btn.disabled = true;
+  closeSheet();
+
+  const extra = { name, relationship: rel, notes };
+
+  /* Re-use last captured frame */
+  isRegistration = true;
+  if (lastBlob) {
+    await pipeline(lastBlob, extra);
+  } else {
+    await captureAndProcess(extra);
+  }
+  isRegistration = false;
+
+  btn.textContent = 'Register & Identify'; btn.disabled = false;
+  document.getElementById('rName').value  = '';
+  document.getElementById('rRel').value   = '';
+  document.getElementById('rNotes').value = '';
+
+  /* After registering, resume scanning */
+  startScan();
+}
+
+/* ── Helpers ── */
+function setLoading(show, txt) {
+  document.getElementById('loadingRow').style.display = show ? 'flex' : 'none';
+  if (txt) document.getElementById('loadingTxt').textContent = txt;
+}
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+initCamera();
+</script>
+</body>
+</html>
