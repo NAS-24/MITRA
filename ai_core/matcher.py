@@ -1,89 +1,55 @@
+import sys
 import os
-import json
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'database'))
+
 import numpy as np
-from deepface import DeepFace
 import cv2
 from mtcnn import MTCNN
+from deepface import DeepFace
 
+# DB module replaces the old JSON helpers
+import db as _db
 
+# ── Patient context ───────────────────────────────────────────────────────────
+ACTIVE_PATIENT_ID: int = int(os.getenv("MITRA_PATIENT_ID", "1"))
+
+# ── Face detector (loaded once at import) ─────────────────────────────────────
 detector = MTCNN()
-def normalize(x):
+
+
+def normalize(x: np.ndarray) -> np.ndarray:
     return x / np.linalg.norm(x)
 
-def extract_face(frame):
-    # Convert BGR → RGB (CRITICAL FIX)
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
+def extract_face(frame: np.ndarray) -> np.ndarray:
+    """Detects first face in frame (BGR), crops and resizes to 160×160."""
+    rgb     = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = detector.detect_faces(rgb)
 
-    if len(results) == 0:
+    if not results:
         raise Exception("No face detected")
 
     x, y, w, h = results[0]['box']
-
-    x = max(0, x)
-    y = max(0, y)
-
+    x, y        = max(0, x), max(0, y)
     h_img, w_img, _ = frame.shape
-    x2 = min(x + w, w_img)
-    y2 = min(y + h, h_img)
-
-    face = frame[y:y2, x:x2]
+    x2, y2      = min(x + w, w_img), min(y + h, h_img)
+    face        = frame[y:y2, x:x2]
 
     if face.size == 0:
         raise Exception("Invalid face crop")
 
-    face = cv2.resize(face, (160, 160))
-
-    return face
-
-DB_PATH = "face_db.json"
-
-def load_db():
-    import json
-    import os
-    import numpy as np
-
-    if not os.path.exists("face_db.json"):
-        return {}
-
-    with open("face_db.json", "r") as f:
-        content = f.read().strip()
-        if not content:
-            return {}
-
-        data = json.loads(content)
-
-    for name in data:
-        data[name]["embedding"] = np.array(data[name]["embedding"])
-
-    return data
+    return cv2.resize(face, (160, 160))
 
 
-def save_db(db):
-    import json
-
-    serializable_db = {}
-    for name, data in db.items():
-        serializable_db[name] = {
-            "id": data["id"],
-            "embedding": list(data["embedding"]),
-            "relationship": data["relationship"],
-            "notes": data["notes"],
-            "last_met": data["last_met"]
-        }
-
-    with open("face_db.json", "w") as f:
-        json.dump(serializable_db, f)
-
-def get_embedding(face):
-    result = DeepFace.represent(
+def get_embedding(face: np.ndarray) -> np.ndarray:
+    """Returns a normalized 512-D ArcFace embedding."""
+    result    = DeepFace.represent(
         img_path=face,
         model_name="ArcFace",
-        enforce_detection=False  
+        enforce_detection=False
     )
     embedding = np.array(result[0]["embedding"])
-    return embedding
+    return normalize(embedding)
 
 
 def cosine_similarity(a, b):
@@ -91,33 +57,36 @@ def cosine_similarity(a, b):
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
-
-def find_match(embedding, db, threshold=0.9):  # cosine range is -1 to 1
+def find_match(embedding, db, threshold=0.9):
     best_match = None
-    best_score = -1
+    best_score = -1.0
 
     for name, data in db.items():
-        db_embedding = np.array(data["embedding"])
-        score = np.dot(embedding, db_embedding)  # now valid cosine since both normalized
-
+        db_emb = np.array(data["embedding"])
+        score  = float(np.dot(embedding, db_emb))
         if score > best_score:
             best_score = score
             best_match = name
 
     if best_score > threshold:
         return best_match, best_score
-
     return None, best_score
+
+
 def build_response(name, score, threshold=0.9):
     if name:
-        return {
-            "person_id": name,
-            "confidence_score": float(score),
-            "is_unknown": False
-        }
-    else:
-        return {
-            "person_id": None,
-            "confidence_score": float(score) if score else 0.0,
-            "is_unknown": True
-        }
+        return {"person_id": name, "confidence_score": float(score), "is_unknown": False}
+    return {"person_id": None, "confidence_score": float(score) if score else 0.0,
+            "is_unknown": True}
+
+
+# ── DB shim — same call signatures, now backed by MySQL ──────────────────────
+
+def load_db(patient_id: int = None) -> dict:
+    """Loads face DB from MySQL (replaces face_db.json read)."""
+    return _db.load_db(patient_id=patient_id or ACTIVE_PATIENT_ID)
+
+
+def save_db(db: dict, patient_id: int = None) -> None:
+    """Saves face DB to MySQL (replaces face_db.json write)."""
+    _db.save_db(db, patient_id=patient_id or ACTIVE_PATIENT_ID)
